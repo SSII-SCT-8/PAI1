@@ -10,7 +10,8 @@ from .config import (
     SERVER_HOST,
     SERVER_PORT,
     CONNECT_TIMEOUT,
-    MESSAGE_TIMEOUT
+    MESSAGE_TIMEOUT,
+    MASTER_KEY_BYTES
 )
 from ..common.protocol import (
     send_message,
@@ -122,7 +123,6 @@ class ClientAPI:
             
             if response.get("success"):
                 logger.info(f"Usuario '{username}' registrado exitosamente")
-                from ..server.config import MASTER_KEY_BYTES
                 self.user_key, self.user_key_salt = derive_user_key(
                     MASTER_KEY_BYTES,
                     username
@@ -139,7 +139,6 @@ class ClientAPI:
         if not self.connected:
             return {"success": False, "message": "No conectado al servidor"}
         
-        from ..server.config import MASTER_KEY_BYTES
         self.user_key, self.user_key_salt = derive_user_key(
             MASTER_KEY_BYTES,
             username

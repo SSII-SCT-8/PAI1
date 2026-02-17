@@ -128,6 +128,17 @@ class TestCrypto(unittest.TestCase):
         user_key_bob, _ = derive_user_key(master_key, "bob", salt)
         self.assertNotEqual(user_key, user_key_bob)
     
+    def test_derive_user_key_default_is_deterministic(self):
+        """Sin salt explicito, la derivacion debe ser determinista por usuario."""
+        master_key = b"master_key_256_bits!!!!!!!!!!!"
+        username = "alice"
+
+        key1, salt1 = derive_user_key(master_key, username)
+        key2, salt2 = derive_user_key(master_key, username)
+
+        self.assertEqual(salt1, salt2)
+        self.assertEqual(key1, key2)
+
     def test_secure_compare_equal(self):
         """Test de comparación segura con strings iguales."""
         self.assertTrue(secure_compare("test", "test"))

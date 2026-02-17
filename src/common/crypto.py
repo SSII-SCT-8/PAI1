@@ -61,9 +61,14 @@ def verify_password(password: str, pw_hash: bytes, salt: bytes) -> bool:
 
 
 def derive_user_key(master_key: bytes, username: str, salt: bytes = None) -> Tuple[bytes, bytes]:
-    """Deriva clave HMAC por usuario con HKDF. Retorna (clave, salt)."""
+    """
+    Deriva clave HMAC por usuario con HKDF. Retorna (clave, salt).
+
+    Si no se proporciona salt, se genera uno determinista a partir del username
+    para que cliente y servidor deriven la misma clave sin intercambio adicional.
+    """
     if salt is None:
-        salt = secrets.token_bytes(16)
+        salt = hashlib.sha256(f"user_salt:{username}".encode('utf-8')).digest()[:16]
     
     info = f"user:{username}".encode('utf-8')
     prk = hmac.new(salt, master_key, hashlib.sha256).digest()     # HKDF-Extract

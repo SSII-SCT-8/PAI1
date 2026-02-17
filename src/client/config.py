@@ -10,6 +10,13 @@ LOG_DIR = BASE_DIR / "logs"
 SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1")
 SERVER_PORT = int(os.getenv("SERVER_PORT", "9999"))
 
+# Clave maestra (debe ser la misma que el servidor)
+MASTER_KEY = os.getenv("MASTER_KEY")
+if not MASTER_KEY:
+    MASTER_KEY = "dev_master_key_256_bits_change_in_production_environment_please"
+
+MASTER_KEY_BYTES = MASTER_KEY.encode('utf-8')[:32].ljust(32, b'\0')
+
 CONNECT_TIMEOUT = 10.0
 MESSAGE_TIMEOUT = 30.0
 
