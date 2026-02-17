@@ -17,8 +17,8 @@ if not MASTER_KEY:
 
 MASTER_KEY_BYTES = MASTER_KEY.encode('utf-8')[:32].ljust(32, b'\0')
 
-CONNECT_TIMEOUT = 10.0
-MESSAGE_TIMEOUT = 30.0
+CONNECT_TIMEOUT = float(os.getenv("CONNECT_TIMEOUT", "10.0"))
+MESSAGE_TIMEOUT = float(os.getenv("MESSAGE_TIMEOUT", "60.0"))
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_TO_FILE = True

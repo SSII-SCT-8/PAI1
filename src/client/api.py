@@ -218,17 +218,42 @@ class ClientAPI:
             send_message(self.sock, msg)
             response = receive_message(self.sock, timeout=MESSAGE_TIMEOUT)
             
-            logger.info(f"Logout exitoso")
+            if response.get("success"):
+                logger.info("Logout exitoso")
+            else:
+                message = str(response.get("message", "Sin detalle"))
+                if "timeout esperando respuesta" in message.lower():
+                    response["message"] = (
+                        "No se pudo confirmar el logout por timeout, "
+                        "pero la sesion local se cerro."
+                    )
+                logger.warning(
+                    "Logout no confirmado por servidor: %s",
+                    response.get("message", "Sin detalle")
+                )
             
             self.session_id = None
             self.username = None
             self.user_key = None
+            self.user_key_salt = None
             
             return response
         
         except Exception as e:
-            logger.error(f"Error en LOGOUT: {e}")
-            return {"success": False, "message": str(e)}
+            detail = str(e)
+            self.session_id = None
+            self.username = None
+            self.user_key = None
+            self.user_key_salt = None
+            if "timeout esperando respuesta" in detail.lower():
+                friendly_message = (
+                    "No se pudo confirmar el logout por timeout, "
+                    "pero la sesion local se cerro."
+                )
+            else:
+                friendly_message = f"Error cerrando sesion: {detail}"
+            logger.error(f"Error en LOGOUT: {detail}")
+            return {"success": False, "message": friendly_message}
     
     # ==================== SIMULACIÓN DE ATAQUES ====================
     

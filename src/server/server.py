@@ -16,7 +16,8 @@ from .config import (
     LOG_LEVEL,
     LOG_TO_FILE,
     LOG_TO_CONSOLE,
-    MAX_CONNECTIONS
+    MAX_CONNECTIONS,
+    CLIENT_MESSAGE_TIMEOUT
 )
 from .storage import Storage
 from .security import SecurityManager
@@ -157,10 +158,14 @@ class IntegrityServer:
         try:
             while self.running:
                 try:
-                    msg_dict = receive_message(client_socket, timeout=30.0)
+                    msg_dict = receive_message(client_socket, timeout=CLIENT_MESSAGE_TIMEOUT)
                 except ProtocolError as e:
-                    if "cerrada" in str(e).lower():
+                    error_text = str(e).lower()
+                    if "cerrada" in error_text:
                         break
+                    if "timeout esperando respuesta" in error_text:
+                        # Timeout de inactividad esperado: no enviar error al cliente.
+                        continue
                     logger.warning(f"Error de protocolo desde {client_ip}: {e}")
                     error_resp = create_error_response("PROTOCOL_ERROR", str(e))
                     send_message(client_socket, error_resp)
