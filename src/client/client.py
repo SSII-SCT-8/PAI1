@@ -4,6 +4,7 @@ Cliente interactivo CLI para el sistema de verificación de integridad.
 import logging
 import sys
 from pathlib import Path
+from getpass import getpass
 
 from .config import LOG_DIR, LOG_LEVEL, LOG_TO_FILE, LOG_TO_CONSOLE
 from .api import ClientAPI
@@ -126,7 +127,7 @@ class InteractiveClient:
             print("❌ Username no puede estar vacío")
             return
         
-        password = input("Contraseña: ").strip()
+        password = getpass(prompt="Contraseña: ")
         if not password:
             print("❌ Password no puede estar vacío")
             return
@@ -148,7 +149,7 @@ class InteractiveClient:
             print("❌ Username no puede estar vacío")
             return
         
-        password = input("Contraseña: ").strip()
+        password = getpass("Contraseña: ")
         if not password:
             print("❌ Password no puede estar vacío")
             return
