@@ -1,12 +1,4 @@
-"""
-Servidor TCP para verificación de integridad en transacciones financieras.
-
-Implementa protección contra:
-- Man-in-the-Middle (HMAC-SHA256)
-- Replay attacks (nonce store)
-- Timing attacks (hmac.compare_digest)
-- Brute force (rate limiting + backoff exponencial)
-"""
+"""Servidor TCP para verificación de integridad en transacciones financieras."""
 import socket
 import threading
 import logging
@@ -71,41 +63,29 @@ class IntegrityServer:
     """Servidor TCP con verificación de integridad."""
     
     def __init__(self, host: str = SERVER_HOST, port: int = SERVER_PORT):
-        """
-        Inicializa el servidor.
-        
-        Args:
-            host: Dirección IP del servidor
-            port: Puerto de escucha
-        """
         self.host = host
         self.port = port
         self.running = False
         self.server_socket: Optional[socket.socket] = None
         
-        # Inicializar componentes
         self.storage = Storage()
         self.security = SecurityManager(self.storage)
         self.handler = MessageHandler(self.storage, self.security)
         
-        # Threading
         self.active_connections = 0
         self.connections_lock = threading.Lock()
         
-        # Registrar señales para shutdown limpio
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
     
     def _signal_handler(self, signum, frame):
-        """Maneja señales de interrupción."""
         logger.info(f"Señal {signum} recibida, cerrando servidor...")
         self.stop()
         sys.exit(0)
     
     def start(self):
         """Inicia el servidor."""
-        try:
-            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((self.host, self.port))
             self.server_socket.listen(MAX_CONNECTIONS)
@@ -115,11 +95,11 @@ class IntegrityServer:
             logger.info(f"✓ Servidor de integridad iniciado en {self.host}:{self.port}")
             logger.info(f"✓ Esperando conexiones (máx: {MAX_CONNECTIONS})...")
             
-            # Thread para limpieza periódica
+
             cleanup_thread = threading.Thread(target=self._periodic_cleanup, daemon=True)
             cleanup_thread.start()
             
-            # Bucle principal de aceptación
+            # Bucle principal
             while self.running:
                 try:
                     client_socket, client_address = self.server_socket.accept()
@@ -134,7 +114,6 @@ class IntegrityServer:
                     
                     logger.info(f"Nueva conexión desde {client_address} (activas: {self.active_connections})")
                     
-                    # Crear thread para manejar el cliente
                     client_thread = threading.Thread(
                         target=self._handle_client,
                         args=(client_socket, client_address),
@@ -163,26 +142,19 @@ class IntegrityServer:
     def _periodic_cleanup(self):
         """Limpia datos antiguos periódicamente."""
         while self.running:
-            time.sleep(60)  # Cada minuto
+            time.sleep(60)
             try:
                 self.security.cleanup_old_data()
             except Exception as e:
                 logger.error(f"Error en limpieza periódica: {e}")
     
     def _handle_client(self, client_socket: socket.socket, client_address: tuple):
-        """
-        Maneja la comunicación con un cliente.
-        
-        Args:
-            client_socket: Socket del cliente
-            client_address: Dirección (IP, puerto) del cliente
-        """
+        """Maneja la comunicación con un cliente."""
         client_ip = client_address[0]
         session_username: Optional[str] = None
         
         try:
             while self.running:
-                # Recibir mensaje
                 try:
                     msg_dict = receive_message(client_socket, timeout=30.0)
                 except ProtocolError as e:
@@ -193,7 +165,7 @@ class IntegrityServer:
                     send_message(client_socket, error_resp)
                     continue
                 
-                # Procesar mensaje
+                # Procesar
                 try:
                     response = self._process_message(msg_dict, client_ip, session_username)
                     
@@ -229,17 +201,7 @@ class IntegrityServer:
         client_ip: str,
         session_username: Optional[str]
     ) -> dict:
-        """
-        Procesa un mensaje recibido.
-        
-        Args:
-            msg_dict: Diccionario del mensaje
-            client_ip: IP del cliente
-            session_username: Usuario de la sesión actual (si existe)
-        
-        Returns:
-            Diccionario de respuesta
-        """
+        """Procesa un mensaje recibido y devuelve la respuesta."""
         msg_type = msg_dict.get("type")
         username = msg_dict.get("username", "")
         nonce = msg_dict.get("nonce", "")
@@ -249,22 +211,18 @@ class IntegrityServer:
         
         logger.debug(f"Procesando {msg_type} de usuario '{username}' (IP: {client_ip})")
         
-        # REGISTER no requiere MAC (aún no tiene clave)
         if msg_type == "REGISTER":
             return self._handle_register(username, payload, client_ip, nonce, ts)
         
         # Resto de operaciones requieren verificación de integridad
         try:
-            # Validar timestamp
             self.security.validate_timestamp(ts)
             
-            # Obtener usuario y su clave
             user = self.storage.get_user(username)
             if not user:
                 logger.warning(f"Mensaje de usuario inexistente: '{username}' (IP: {client_ip})")
                 return create_error_response("AUTH_ERROR", "Usuario no autenticado")
             
-            # Verificar HMAC
             canonical_bytes = canonicalize_message(msg_dict)
             user_key = user["user_key"]
             
@@ -275,15 +233,12 @@ class IntegrityServer:
                 )
                 raise InvalidMACError("MAC inválido (posible ataque MITM)")
             
-            # Verificar y almacenar nonce (anti-replay)
             self.security.check_and_store_nonce(username, nonce, ts)
             
-            # Procesar según tipo de mensaje
             if msg_type == "LOGIN":
                 return self.handler.handle_login(username, payload, client_ip)
             
             elif msg_type == "TX":
-                # TX requiere sesión activa (LOGIN previo)
                 if not session_username or session_username != username:
                     logger.warning(
                         f"TX rechazada: usuario '{username}' sin sesión activa (IP: {client_ip})"
@@ -299,7 +254,6 @@ class IntegrityServer:
                 )
             
             elif msg_type == "LOGOUT":
-                # LOGOUT requiere sesión activa
                 if not session_username or session_username != username:
                     logger.warning(
                         f"LOGOUT rechazado: usuario '{username}' sin sesión activa (IP: {client_ip})"
@@ -336,26 +290,10 @@ class IntegrityServer:
         nonce: str,
         ts: int
     ) -> dict:
-        """
-        Maneja REGISTER sin verificación de MAC (usuario nuevo).
-        
-        Args:
-            username: Nombre de usuario
-            payload: Datos del registro
-            client_ip: IP del cliente
-            nonce: Nonce del mensaje
-            ts: Timestamp
-        
-        Returns:
-            Respuesta
-        """
+        """Maneja REGISTER sin verificación de MAC (usuario nuevo)."""
         try:
-            # Validar timestamp
             self.security.validate_timestamp(ts)
             
-            # Para REGISTER, el nonce se verifica contra un store temporal
-            # para evitar registrar el mismo usuario múltiples veces
-            # (usamos username "REGISTER" como clave temporal)
             try:
                 self.security.check_and_store_nonce("REGISTER:" + username, nonce, ts)
             except ReplayAttackError:

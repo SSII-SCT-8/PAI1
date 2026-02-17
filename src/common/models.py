@@ -19,17 +19,7 @@ class MessageType(Enum):
 
 @dataclass
 class Message:
-    """
-    Estructura base de un mensaje del protocolo.
-    
-    Campos:
-    - type: tipo de operación
-    - ts: timestamp Unix en milisegundos
-    - nonce: nonce único en base64 (>=128 bits recomendado)
-    - username: identificador del usuario
-    - payload: datos específicos del mensaje
-    - mac: HMAC-SHA256 en base64 (calculado sobre todos los campos excepto 'mac')
-    """
+    """Estructura base de un mensaje del protocolo."""
     type: str
     ts: int
     nonce: str
@@ -75,12 +65,7 @@ class LoginPayload:
 
 @dataclass
 class TransactionPayload:
-    """
-    Payload para transacción financiera.
-    
-    Formato: Cuenta origen, Cuenta destino, Cantidad transferida
-    NO se validan las cuentas ni cantidades; el servidor solo registra.
-    """
+    """Payload para transacción financiera."""
     from_account: str
     to_account: str
     amount: str  # String para evitar problemas de precisión en JSON

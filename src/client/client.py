@@ -33,7 +33,6 @@ class InteractiveClient:
     """Cliente interactivo con menú."""
     
     def __init__(self):
-        """Inicializa el cliente interactivo."""
         self.api = ClientAPI()
         self.running = True
     

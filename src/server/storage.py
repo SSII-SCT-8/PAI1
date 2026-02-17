@@ -1,6 +1,4 @@
-"""
-Capa de almacenamiento con SQLite para persistencia de usuarios, transacciones, nonces y sesiones.
-"""
+"""Capa de almacenamiento con SQLite."""
 import sqlite3
 import json
 import base64
@@ -21,12 +19,6 @@ class Storage:
     """Maneja la persistencia en SQLite."""
     
     def __init__(self, db_path: Path = DB_PATH):
-        """
-        Inicializa el storage.
-        
-        Args:
-            db_path: Ruta al archivo SQLite
-        """
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
@@ -54,7 +46,6 @@ class Storage:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             
-            # Tabla de usuarios
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +60,6 @@ class Storage:
                 )
             """)
             
-            # Tabla de nonces (para anti-replay)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS nonces (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,13 +71,11 @@ class Storage:
                 )
             """)
             
-            # Índice para limpiar nonces antiguos
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_nonces_ts 
                 ON nonces(ts)
             """)
             
-            # Tabla de sesiones
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +86,6 @@ class Storage:
                 )
             """)
             
-            # Tabla de transacciones
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS transactions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,7 +100,6 @@ class Storage:
                 )
             """)
             
-            # Tabla de rate limiting
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS login_attempts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,7 +117,6 @@ class Storage:
             
             logger.info(f"Base de datos inicializada en {self.db_path}")
     
-    # ==================== USUARIOS ====================
     
     def create_user(
         self,
@@ -140,21 +125,7 @@ class Storage:
         user_key: bytes,
         user_key_salt: bytes
     ) -> bool:
-        """
-        Crea un nuevo usuario.
-        
-        Args:
-            username: Nombre de usuario
-            password: Contraseña en texto plano
-            user_key: Clave derivada para HMAC del usuario
-            user_key_salt: Salt usado en la derivación
-        
-        Returns:
-            True si se creó correctamente
-        
-        Raises:
-            sqlite3.IntegrityError: Si el usuario ya existe
-        """
+        """Crea un nuevo usuario."""
         pw_hash, pw_salt = hash_password(password)
         kdf_params = {
             "algorithm": "PBKDF2-HMAC-SHA256",
@@ -184,15 +155,7 @@ class Storage:
         return True
     
     def get_user(self, username: str) -> Optional[Dict[str, Any]]:
-        """
-        Obtiene información de un usuario.
-        
-        Args:
-            username: Nombre de usuario
-        
-        Returns:
-            Diccionario con datos del usuario o None si no existe
-        """
+        """Obtiene información de un usuario o None si no existe."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -221,20 +184,9 @@ class Storage:
         """Verifica si un usuario existe."""
         return self.get_user(username) is not None
     
-    # ==================== NONCES ====================
     
     def store_nonce(self, username: str, nonce: str, ts: int) -> bool:
-        """
-        Almacena un nonce para anti-replay.
-        
-        Args:
-            username: Usuario
-            nonce: Nonce en base64
-            ts: Timestamp del mensaje
-        
-        Returns:
-            True si se almacenó (False si ya existía = replay)
-        """
+        """Almacena un nonce (retorna False si ya existía = replay)."""
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -249,16 +201,10 @@ class Storage:
                 ))
             return True
         except sqlite3.IntegrityError:
-            # Nonce ya existe = replay attack
             return False
     
     def cleanup_old_nonces(self, max_age_seconds: int = 600):
-        """
-        Limpia nonces antiguos (fuera de la ventana de replay).
-        
-        Args:
-            max_age_seconds: Edad máxima en segundos
-        """
+        """Limpia nonces fuera de la ventana de replay."""
         cutoff_ts = int((datetime.now().timestamp() - max_age_seconds) * 1000)
         
         with self._get_connection() as conn:
@@ -269,19 +215,9 @@ class Storage:
         if deleted > 0:
             logger.debug(f"Limpiados {deleted} nonces antiguos")
     
-    # ==================== SESIONES ====================
     
     def create_session(self, username: str, session_id: str) -> bool:
-        """
-        Crea una nueva sesión.
-        
-        Args:
-            username: Usuario
-            session_id: ID de sesión único
-        
-        Returns:
-            True si se creó correctamente
-        """
+        """Crea una nueva sesión."""
         now = int(datetime.now().timestamp() * 1000)
         
         with self._get_connection() as conn:
@@ -350,21 +286,7 @@ class Storage:
         raw_message: str,
         mac_trunc: str
     ) -> int:
-        """
-        Almacena una transacción.
-        
-        Args:
-            username: Usuario que realiza la transacción
-            from_account: Cuenta origen
-            to_account: Cuenta destino
-            amount: Cantidad
-            ts: Timestamp del mensaje
-            raw_message: Mensaje JSON completo
-            mac_trunc: MAC truncado para log
-        
-        Returns:
-            ID de la transacción
-        """
+        """Almacena una transacción y retorna su ID."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -402,17 +324,9 @@ class Storage:
             
             return [dict(row) for row in cursor.fetchall()]
     
-    # ==================== RATE LIMITING ====================
     
     def record_login_attempt(self, username: str, ip_address: str, success: bool) -> None:
-        """
-        Registra un intento de login.
-        
-        Args:
-            username: Usuario
-            ip_address: Dirección IP
-            success: Si el intento fue exitoso
-        """
+        """Registra un intento de login."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -426,16 +340,7 @@ class Storage:
             ))
     
     def get_failed_login_count(self, username: str, window_seconds: int) -> int:
-        """
-        Obtiene el número de intentos fallidos en una ventana de tiempo.
-        
-        Args:
-            username: Usuario
-            window_seconds: Ventana de tiempo en segundos
-        
-        Returns:
-            Número de intentos fallidos
-        """
+        """Obtiene el número de intentos fallidos en una ventana de tiempo."""
         cutoff_ts = int((datetime.now().timestamp() - window_seconds) * 1000)
         
         with self._get_connection() as conn:
@@ -462,12 +367,7 @@ class Storage:
             logger.debug(f"Limpiados {deleted} intentos de login antiguos")
 
     def clear_failed_login_attempts(self, username: str) -> None:
-        """
-        Elimina los intentos fallidos de un usuario tras login exitoso.
-        
-        Args:
-            username: Usuario cuyos intentos fallidos se limpian
-        """
+        """Elimina los intentos fallidos de un usuario tras login exitoso."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(

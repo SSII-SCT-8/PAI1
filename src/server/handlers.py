@@ -28,13 +28,6 @@ class MessageHandler:
     """Maneja los diferentes tipos de mensajes recibidos."""
     
     def __init__(self, storage: Storage, security: SecurityManager):
-        """
-        Inicializa el handler.
-        
-        Args:
-            storage: Instancia de Storage
-            security: Instancia de SecurityManager
-        """
         self.storage = storage
         self.security = security
     
@@ -44,17 +37,7 @@ class MessageHandler:
         payload: Dict[str, Any],
         client_ip: str
     ) -> Dict[str, Any]:
-        """
-        Maneja el registro de un nuevo usuario.
-        
-        Args:
-            username: Nombre de usuario
-            payload: Debe contener {"password": "..."}
-            client_ip: IP del cliente
-        
-        Returns:
-            Respuesta de éxito o error
-        """
+        """Maneja el registro de un nuevo usuario."""
         try:
             password = payload.get("password")
             if not password:
@@ -63,17 +46,13 @@ class MessageHandler:
                     "message": "Password requerido"
                 }
             
-            # Verificar si el usuario ya existe
             if self.storage.user_exists(username):
                 logger.warning(
                     f"REGISTER fallido: usuario '{username}' ya existe (IP: {client_ip})"
                 )
                 raise UserAlreadyExistsError(f"El usuario '{username}' ya existe")
             
-            # Derivar clave única para el usuario
             user_key, user_key_salt = derive_user_key(MASTER_KEY_BYTES, username)
-            
-            # Crear usuario
             self.storage.create_user(username, password, user_key, user_key_salt)
             
             logger.info(f"Usuario '{username}' registrado exitosamente desde {client_ip}")
@@ -101,19 +80,8 @@ class MessageHandler:
         payload: Dict[str, Any],
         client_ip: str
     ) -> Dict[str, Any]:
-        """
-        Maneja el login de un usuario.
-        
-        Args:
-            username: Nombre de usuario
-            payload: Debe contener {"password": "..."}
-            client_ip: IP del cliente
-        
-        Returns:
-            Respuesta con session_id si éxito
-        """
+        """Maneja el login de un usuario."""
         try:
-            # Verificar rate limit
             self.security.check_rate_limit(username, client_ip)
             
             password = payload.get("password")
@@ -123,7 +91,6 @@ class MessageHandler:
                     "success": False,
                     "message": "Password requerido"
                 }
-            
             # Obtener usuario
             user = self.storage.get_user(username)
             if not user:
@@ -134,7 +101,6 @@ class MessageHandler:
                     "message": "Credenciales inválidas"
                 }
             
-            # Verificar password
             if not verify_password(password, user["pw_hash"], user["pw_salt"]):
                 self.security.record_login_attempt(username, client_ip, False)
                 logger.warning(f"LOGIN fallido: password incorrecto para '{username}' (IP: {client_ip})")
@@ -143,11 +109,9 @@ class MessageHandler:
                     "message": "Credenciales inválidas"
                 }
             
-            # Generar session_id
             session_id = secrets.token_urlsafe(32)
             self.storage.create_session(username, session_id)
             
-            # Resetear contador de intentos fallidos
             self.security.reset_failed_attempts(username)
             self.security.record_login_attempt(username, client_ip, True)
             
@@ -177,19 +141,7 @@ class MessageHandler:
         mac_trunc: str,
         ts: int
     ) -> Dict[str, Any]:
-        """
-        Maneja una transacción financiera.
-        
-        Args:
-            username: Usuario autenticado
-            payload: Debe contener from_account, to_account, amount
-            raw_message: Mensaje JSON completo para auditoría
-            mac_trunc: MAC truncado para log
-            ts: Timestamp del mensaje
-        
-        Returns:
-            Respuesta de éxito o error
-        """
+        """Maneja una transacción financiera."""
         try:
             from_account = payload.get("from_account")
             to_account = payload.get("to_account")
@@ -201,7 +153,7 @@ class MessageHandler:
                     "message": "Faltan campos: from_account, to_account, amount"
                 }
             
-            # Almacenar transacción (NO se validan cuentas ni montos)
+            # Almacenar transacción
             tx_id = self.storage.store_transaction(
                 username=username,
                 from_account=from_account,
@@ -240,16 +192,7 @@ class MessageHandler:
         username: str,
         payload: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Maneja el logout de un usuario.
-        
-        Args:
-            username: Usuario autenticado
-            payload: Debe contener {"session_id": "..."}
-        
-        Returns:
-            Respuesta de éxito
-        """
+        """Maneja el logout de un usuario."""
         try:
             session_id = payload.get("session_id")
             if session_id:
@@ -265,20 +208,12 @@ class MessageHandler:
         except Exception as e:
             logger.error(f"Error en LOGOUT: {e}", exc_info=True)
             return {
-                "success": True,  # Siempre éxito en logout
+                "success": True,
                 "message": "Logout completado"
             }
     
     def handle_ping(self, username: str) -> Dict[str, Any]:
-        """
-        Maneja un mensaje PING (para keep-alive).
-        
-        Args:
-            username: Usuario
-        
-        Returns:
-            Respuesta PONG
-        """
+        """Maneja un mensaje PING (keep-alive)."""
         return {
             "success": True,
             "message": "PONG",

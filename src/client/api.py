@@ -33,34 +33,20 @@ class ClientAPI:
     """Cliente para comunicación con el servidor de integridad."""
     
     def __init__(self, host: str = SERVER_HOST, port: int = SERVER_PORT):
-        """
-        Inicializa el cliente.
-        
-        Args:
-            host: Host del servidor
-            port: Puerto del servidor
-        """
         self.host = host
         self.port = port
         self.sock: Optional[socket.socket] = None
         self.connected = False
         
-        # Sesión
         self.username: Optional[str] = None
         self.session_id: Optional[str] = None
         self.user_key: Optional[bytes] = None
         self.user_key_salt: Optional[bytes] = None
         
-        # Anti-replay del lado del cliente (evitar reutilización de nonces locales)
         self._used_nonces: Set[str] = set()
     
     def connect(self) -> bool:
-        """
-        Conecta con el servidor.
-        
-        Returns:
-            True si se conectó correctamente
-        """
+        """Conecta con el servidor."""
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.sock.settimeout(CONNECT_TIMEOUT)
@@ -87,12 +73,7 @@ class ClientAPI:
         logger.info("Desconectado del servidor")
     
     def _generate_unique_nonce(self) -> str:
-        """
-        Genera un nonce único no usado anteriormente.
-        
-        Returns:
-            Nonce en base64
-        """
+        """Genera un nonce único no usado anteriormente."""
         nonce = generate_nonce()
         while nonce in self._used_nonces:
             nonce = generate_nonce()
@@ -106,18 +87,7 @@ class ClientAPI:
         payload: Dict[str, Any],
         use_mac: bool = True
     ) -> Dict[str, Any]:
-        """
-        Crea un mensaje con timestamp, nonce y MAC.
-        
-        Args:
-            msg_type: Tipo de mensaje
-            username: Usuario
-            payload: Datos del mensaje
-            use_mac: Si debe calcular MAC (False para REGISTER)
-        
-        Returns:
-            Diccionario del mensaje
-        """
+        """Crea un mensaje con timestamp, nonce y MAC."""
         msg_dict = {
             "type": msg_type,
             "ts": int(time.time() * 1000),
@@ -127,7 +97,6 @@ class ClientAPI:
         }
         
         if use_mac and self.user_key:
-            # Calcular MAC sobre mensaje canónico
             canonical_bytes = canonicalize_message(msg_dict)
             mac = compute_hmac(self.user_key, canonical_bytes)
             msg_dict["mac"] = mac
@@ -135,16 +104,7 @@ class ClientAPI:
         return msg_dict
     
     def register(self, username: str, password: str) -> Dict[str, Any]:
-        """
-        Registra un nuevo usuario.
-        
-        Args:
-            username: Nombre de usuario
-            password: Contraseña
-        
-        Returns:
-            Respuesta del servidor
-        """
+        """Registra un nuevo usuario."""
         if not self.connected:
             return {"success": False, "message": "No conectado al servidor"}
         
@@ -162,9 +122,6 @@ class ClientAPI:
             
             if response.get("success"):
                 logger.info(f"Usuario '{username}' registrado exitosamente")
-                # Derivar clave para futuros mensajes
-                # NOTA: En producción, el cliente debería recibir la clave del servidor
-                # o derivarla de una forma segura. Aquí usamos derivación local.
                 from ..server.config import MASTER_KEY_BYTES
                 self.user_key, self.user_key_salt = derive_user_key(
                     MASTER_KEY_BYTES,
@@ -178,20 +135,10 @@ class ClientAPI:
             return {"success": False, "message": str(e)}
     
     def login(self, username: str, password: str) -> Dict[str, Any]:
-        """
-        Inicia sesión.
-        
-        Args:
-            username: Nombre de usuario
-            password: Contraseña
-        
-        Returns:
-            Respuesta del servidor con session_id
-        """
+        """Inicia sesión."""
         if not self.connected:
             return {"success": False, "message": "No conectado al servidor"}
         
-        # Derivar clave del usuario para MAC
         from ..server.config import MASTER_KEY_BYTES
         self.user_key, self.user_key_salt = derive_user_key(
             MASTER_KEY_BYTES,
@@ -214,7 +161,6 @@ class ClientAPI:
                 self.username = username
                 logger.info(f"Login exitoso: usuario '{username}'")
             else:
-                # Limpiar clave si login falla
                 self.user_key = None
                 self.user_key_salt = None
             
@@ -231,17 +177,7 @@ class ClientAPI:
         to_account: str,
         amount: str
     ) -> Dict[str, Any]:
-        """
-        Envía una transacción.
-        
-        Args:
-            from_account: Cuenta origen
-            to_account: Cuenta destino
-            amount: Cantidad
-        
-        Returns:
-            Respuesta del servidor
-        """
+        """Envía una transacción."""
         if not self.username or not self.user_key:
             return {"success": False, "message": "No autenticado"}
         
@@ -269,12 +205,7 @@ class ClientAPI:
             return {"success": False, "message": str(e)}
     
     def logout(self) -> Dict[str, Any]:
-        """
-        Cierra sesión.
-        
-        Returns:
-            Respuesta del servidor
-        """
+        """Cierra sesión."""
         if not self.username or not self.session_id:
             return {"success": False, "message": "No hay sesión activa"}
         
@@ -290,7 +221,6 @@ class ClientAPI:
             
             logger.info(f"Logout exitoso")
             
-            # Limpiar sesión local
             self.session_id = None
             self.username = None
             self.user_key = None
@@ -301,7 +231,7 @@ class ClientAPI:
             logger.error(f"Error en LOGOUT: {e}")
             return {"success": False, "message": str(e)}
     
-    # ==================== MODOS DE ATAQUE (SIMULACIÓN) ====================
+    # ==================== SIMULACIÓN DE ATAQUES ====================
     
     def send_replay_attack(
         self,
@@ -309,12 +239,7 @@ class ClientAPI:
         to_account: str,
         amount: str
     ) -> tuple:
-        """
-        Simula un ataque de replay enviando el mismo mensaje dos veces.
-        
-        Returns:
-            Tupla (respuesta1, respuesta2)
-        """
+        """Simula un ataque de replay enviando el mismo mensaje dos veces."""
         if not self.username or not self.user_key:
             error = {"success": False, "message": "No autenticado"}
             return error, error
@@ -330,7 +255,7 @@ class ClientAPI:
             }
         )
         
-        # IMPORTANTE: Remover el nonce del set local para permitir reenvío
+        # Remover el nonce del set local para permitir reenvío
         if msg["nonce"] in self._used_nonces:
             self._used_nonces.remove(msg["nonce"])
         
@@ -361,18 +286,7 @@ class ClientAPI:
         amount: str,
         tampered_amount: str
     ) -> Dict[str, Any]:
-        """
-        Simula un ataque MITM modificando el payload después de calcular el MAC.
-        
-        Args:
-            from_account: Cuenta origen
-            to_account: Cuenta destino
-            amount: Cantidad original
-            tampered_amount: Cantidad modificada (simulando MITM)
-        
-        Returns:
-            Respuesta del servidor (debería rechazar por MAC inválido)
-        """
+        """Simula un ataque MITM modificando el payload tras calcular el MAC."""
         if not self.username or not self.user_key:
             return {"success": False, "message": "No autenticado"}
         
@@ -387,7 +301,7 @@ class ClientAPI:
             }
         )
         
-        # SIMULAR MITM: Modificar el payload DESPUÉS de calcular MAC
+        # Modificar payload DESPUÉS de calcular MAC (simula MITM)
         logger.warning(
             f"⚠️  SIMULACIÓN DE ATAQUE MITM: "
             f"modificando amount de {amount} a {tampered_amount}"
