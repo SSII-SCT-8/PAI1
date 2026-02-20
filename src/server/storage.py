@@ -47,9 +47,7 @@ class Storage:
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
-                    pw_hash BLOB NOT NULL,
-                    pw_salt BLOB NOT NULL,
-                    kdf_params_json TEXT NOT NULL,
+                    password TEXT NOT NULL,
                     user_key BLOB NOT NULL,
                     user_key_salt BLOB NOT NULL,
                     created_at INTEGER NOT NULL,
@@ -118,28 +116,21 @@ class Storage:
         self, username: str, password: str, user_key: bytes, user_key_salt: bytes
     ) -> bool:
         """Crea un nuevo usuario."""
-        pw_hash, pw_salt = hash_password(password)
-        kdf_params = {
-            "algorithm": "PBKDF2-HMAC-SHA256",
-            "iterations": PBKDF2_ITERATIONS,
-            "salt_size": len(pw_salt),
-        }
+        password = hash_password(password)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO users (
-                    username, pw_hash, pw_salt, kdf_params_json,
+                    username, password,
                     user_key, user_key_salt, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
             """,
                 (
                     username,
-                    pw_hash,
-                    pw_salt,
-                    json.dumps(kdf_params),
+                    password,
                     user_key,
                     user_key_salt,
                     int(datetime.now().timestamp() * 1000),
@@ -155,7 +146,7 @@ class Storage:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT id, username, pw_hash, pw_salt, kdf_params_json,
+                SELECT id, username, password,
                        user_key, user_key_salt, created_at
                 FROM users
                 WHERE username = ?
@@ -170,9 +161,7 @@ class Storage:
             return {
                 "id": row["id"],
                 "username": row["username"],
-                "pw_hash": row["pw_hash"],
-                "pw_salt": row["pw_salt"],
-                "kdf_params": json.loads(row["kdf_params_json"]),
+                "password": row["password"],
                 "user_key": row["user_key"],
                 "user_key_salt": row["user_key_salt"],
                 "created_at": row["created_at"],

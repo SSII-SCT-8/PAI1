@@ -76,7 +76,7 @@ class MessageHandler:
                 )
                 return {"success": False, "message": "Credenciales inválidas"}
 
-            if not verify_password(password, user["pw_hash"], user["pw_salt"]):
+            if not verify_password(password, user["password"]):
                 self.security.record_login_attempt(username, client_ip, False)
                 logger.warning(
                     f"LOGIN fallido: password incorrecto para '{username}' (IP: {client_ip})"

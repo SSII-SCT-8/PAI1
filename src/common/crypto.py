@@ -5,6 +5,8 @@ import hashlib
 import hmac
 import secrets
 from typing import Tuple
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 HMAC_KEY_SIZE = 32  # 256 bits
 NONCE_SIZE = 16  # 128 bits
@@ -38,26 +40,26 @@ def verify_hmac(key: bytes, message: bytes, mac_b64: str) -> bool:
         return False
 
 
-def hash_password(password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
-    """Hash de password con PBKDF2-HMAC-SHA256. Retorna (hash, salt)."""
-    if salt is None:
-        salt = secrets.token_bytes(SALT_SIZE)
+def hash_password(password: str) -> str:
+    """Hash de password con Argon2id."""
+    ph = PasswordHasher()
+    hash = ph.hash(password)
 
-    pw_hash = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS, dklen=32
-    )
-
-    return pw_hash, salt
+    return hash
 
 
-def verify_password(password: str, pw_hash: bytes, salt: bytes) -> bool:
+def verify_password(password: str, hash: str) -> bool:
     """Verifica password en tiempo constante."""
-    computed_hash, _ = hash_password(password, salt)
-    return hmac.compare_digest(pw_hash, computed_hash)
+    ph = PasswordHasher()
+
+    try:
+        return ph.verify(hash, password)
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
+        return False
 
 
 def derive_user_key(
-    master_key: bytes, username: str, salt: bytes = None
+    master_key: bytes, username: str, salt: bytes | None = None
 ) -> Tuple[bytes, bytes]:
     """
     Deriva clave HMAC por usuario con HKDF. Retorna (clave, salt).
@@ -72,7 +74,7 @@ def derive_user_key(
     prk = hmac.new(salt, master_key, hashlib.sha256).digest()  # HKDF-Extract
     okm = hmac.new(prk, info + b"\x01", hashlib.sha256).digest()  # HKDF-Expand
 
-    return okm[:32], salt
+    return okm, salt
 
 
 def secure_compare(a: str, b: str) -> bool:
