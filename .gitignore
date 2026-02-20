@@ -30,6 +30,7 @@ venv.bak/
 
 # Local environment
 .env
+.nosync
 
 # Runtime artifacts
 *.db

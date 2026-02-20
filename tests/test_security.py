@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import sys
+
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -14,11 +15,7 @@ from src.server.security import SecurityManager
 from src.server.config import TIMESTAMP_WINDOW, MAX_LOGIN_ATTEMPTS
 from src.common.crypto import generate_nonce, compute_hmac, verify_hmac, generate_key
 from src.common.protocol import canonicalize_message
-from src.common.errors import (
-    InvalidTimestampError,
-    ReplayAttackError,
-    RateLimitError
-)
+from src.common.errors import InvalidTimestampError, ReplayAttackError, RateLimitError
 
 
 class TestSecurityFull(unittest.TestCase):
@@ -42,9 +39,13 @@ class TestSecurityFull(unittest.TestCase):
     def test_modified_transaction(self):
         """Payload modificado invalida el MAC."""
         key = generate_key()
-        msg = {"type": "TX", "ts": int(time.time() * 1000),
-               "nonce": "n1", "username": "alice",
-               "payload": {"amount": "100"}}
+        msg = {
+            "type": "TX",
+            "ts": int(time.time() * 1000),
+            "nonce": "n1",
+            "username": "alice",
+            "payload": {"amount": "100"},
+        }
         mac = compute_hmac(key, canonicalize_message(msg))
         msg["payload"]["amount"] = "999"
         self.assertFalse(verify_hmac(key, canonicalize_message(msg), mac))
@@ -52,9 +53,13 @@ class TestSecurityFull(unittest.TestCase):
     def test_mitm_login(self):
         """Mensaje LOGIN alterado es detectado por MAC."""
         key = generate_key()
-        msg = {"type": "LOGIN", "ts": int(time.time() * 1000),
-               "nonce": "n2", "username": "alice",
-               "payload": {"password": "pass"}}
+        msg = {
+            "type": "LOGIN",
+            "ts": int(time.time() * 1000),
+            "nonce": "n2",
+            "username": "alice",
+            "payload": {"password": "pass"},
+        }
         mac = compute_hmac(key, canonicalize_message(msg))
         msg["payload"]["password"] = "hacked"
         self.assertFalse(verify_hmac(key, canonicalize_message(msg), mac))
@@ -84,6 +89,7 @@ class TestSecurityFull(unittest.TestCase):
     def test_secure_comparator(self):
         """hmac.compare_digest se usa en verify_hmac."""
         import hmac as _hmac
+
         key = generate_key()
         data = b"test"
         mac = compute_hmac(key, data)
@@ -93,3 +99,4 @@ class TestSecurityFull(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
