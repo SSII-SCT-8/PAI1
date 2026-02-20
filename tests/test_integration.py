@@ -51,7 +51,7 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(user["username"], username)
 
         # Verificar que el password está hasheado (no en claro)
-        self.assertTrue(verify_password(password, user["pw_hash"], user["pw_salt"]))
+        self.assertTrue(verify_password(password, user["password"]))
 
         # 2. LOGIN
         print("\n2. Iniciando sesión...")
