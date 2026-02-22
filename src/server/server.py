@@ -236,7 +236,8 @@ class IntegrityServer:
                 logger.warning(
                     f"Mensaje de usuario inexistente: '{username}' (IP: {client_ip})"
                 )
-                return create_error_response("AUTH_ERROR", "Usuario no autenticado")
+                self.security.record_login_attempt(username, client_ip, False)
+                return create_error_response("AUTH_ERROR", "Credenciales inválidas")
 
             canonical_bytes = canonicalize_message(msg_dict)
             user_key = user["user_key"]
