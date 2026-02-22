@@ -76,7 +76,7 @@ PAI1/
 
 ### 1. **src/common/** - Código Compartido
 
-- **crypto.py**: Funciones criptográficas (HMAC-SHA256, PBKDF2, HKDF, comparaciones seguras)
+- **crypto.py**: Funciones criptográficas (HMAC-SHA256, HKDF, comparaciones seguras)
 - **protocol.py**: Protocolo de comunicación TCP con framing y canonicalización JSON
 - **models.py**: Definición de estructuras de datos (Message, User, Transaction)
 - **errors.py**: Excepciones personalizadas (InvalidMACError, ReplayAttackError, etc.)

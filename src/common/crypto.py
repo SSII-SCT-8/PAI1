@@ -11,7 +11,6 @@ from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHas
 HMAC_KEY_SIZE = 32  # 256 bits
 NONCE_SIZE = 16  # 128 bits
 SALT_SIZE = 16  # 128 bits
-PBKDF2_ITERATIONS = 150000  # OWASP >= 120,000 para SHA-256
 
 
 def generate_key(size: int = HMAC_KEY_SIZE) -> bytes:

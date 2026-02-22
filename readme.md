@@ -28,7 +28,7 @@ Sistema cliente-servidor de verificación de integridad para transacciones finan
 - Registro de intentos fallidos con ventana de tiempo (5 minutos)
 
 ### 5. **Protección de Credenciales**
-- PBKDF2-HMAC-SHA256 con 150,000 iteraciones (OWASP 2023)
+- Argon2id
 - Salt aleatorio por usuario (128 bits)
 - Nunca se almacenan contraseñas en claro
 - Derivación de claves por usuario con HKDF
@@ -349,7 +349,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 - ✅ Nonce único + timestamp para anti-replay
 - ✅ `hmac.compare_digest()` para anti-timing
 - ✅ Rate limiting + backoff exponencial
-- ✅ PBKDF2 (150k iter) para passwords
+- ✅ Argon2id para contraseñas
 - ✅ HKDF para derivación de claves por usuario
 - ✅ Persistencia SQLite (usuarios, transacciones, nonces, sesiones)
 - ✅ Logs completos con eventos de seguridad

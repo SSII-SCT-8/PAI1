@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..common.crypto import PBKDF2_ITERATIONS, hash_password
+from ..common.crypto import hash_password
 from .config import DB_PATH, DB_TIMEOUT
 
 logger = logging.getLogger(__name__)
